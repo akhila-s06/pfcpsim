@@ -19,6 +19,11 @@ const (
 	DefaultHeartbeatPeriod = 5
 )
 
+type recoveryTS struct {
+	local  time.Time
+	remote time.Time
+}
+
 // PFCPClient enables to simulate a client sending PFCP messages towards the UPF.
 // It provides two usage modes:
 // - 1st mode enables high-level PFCP operations (e.g., SetupAssociation())
@@ -43,6 +48,8 @@ type PFCPClient struct {
 
 	localAddr string
 	conn      *net.UDPConn
+
+	ts recoveryTS
 }
 
 func NewPFCPClient(localAddr string) *PFCPClient {
@@ -115,6 +122,12 @@ func (c *PFCPClient) receiveFromN4() {
 
 		if hbResp, ok := msg.(*message.HeartbeatResponse); ok {
 			c.heartbeatsChan <- hbResp
+		} else if hbReq, ok := msg.(*message.HeartbeatRequest); ok {
+			err := c.sendHeartbeatResponse(hbReq)
+			if err != nil {
+				fmt.Println("send HeartBeatResponse failed:", err)
+				continue
+			}
 		} else {
 			c.recvChan <- msg
 		}
@@ -435,4 +448,13 @@ func (c *PFCPClient) DeleteSession(sess *PFCPSession) error {
 	}
 
 	return nil
+}
+
+func (c *PFCPClient) sendHeartbeatResponse(hbreq *message.HeartbeatRequest) error {
+	// Build response message
+	hbres := message.NewHeartbeatResponse(hbreq.SequenceNumber,
+		ieLib.NewRecoveryTimeStamp(c.ts.local), /* ts */
+	)
+
+	return c.sendMsg(hbres)
 }
