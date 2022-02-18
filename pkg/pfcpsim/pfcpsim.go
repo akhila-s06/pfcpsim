@@ -36,12 +36,14 @@ type PFCPClient struct {
 
 	aliveLock           sync.Mutex
 	isAssociationActive bool
+	isHeartbeatActive   bool
 
 	ctx              context.Context
 	cancelHeartbeats context.CancelFunc
 
 	heartbeatsChan chan *message.HeartbeatResponse
 	recvChan       chan message.Message
+	hbReqChan      chan *message.HeartbeatRequest
 
 	sequenceNumber uint32
 	seqNumLock     sync.Mutex
@@ -61,6 +63,7 @@ func NewPFCPClient(localAddr string) *PFCPClient {
 	client.ctx = context.Background()
 	client.heartbeatsChan = make(chan *message.HeartbeatResponse)
 	client.recvChan = make(chan message.Message)
+	client.hbReqChan = make(chan *message.HeartbeatRequest)
 
 	return client
 }
@@ -123,11 +126,7 @@ func (c *PFCPClient) receiveFromN4() {
 		if hbResp, ok := msg.(*message.HeartbeatResponse); ok {
 			c.heartbeatsChan <- hbResp
 		} else if hbReq, ok := msg.(*message.HeartbeatRequest); ok {
-			err := c.sendHeartbeatResponse(hbReq)
-			if err != nil {
-				fmt.Println("send HeartBeatResponse failed:", err)
-				continue
-			}
+			c.hbReqChan <- hbReq
 		} else {
 			c.recvChan <- msg
 		}
@@ -309,6 +308,8 @@ func (c *PFCPClient) SetupAssociation() error {
 	ctx, cancelFunc := context.WithCancel(c.ctx)
 	c.cancelHeartbeats = cancelFunc
 
+	go c.StartHeartbeatResponse(ctx)
+
 	c.setAssociationStatus(true)
 
 	go c.StartHeartbeats(ctx)
@@ -457,4 +458,44 @@ func (c *PFCPClient) sendHeartbeatResponse(hbreq *message.HeartbeatRequest) erro
 	)
 
 	return c.sendMsg(hbres)
+}
+
+func (c *PFCPClient) StartHeartbeatResponse(stopCtx context.Context) {
+	var hbReqCount int = 0
+	heartBeatExpiryTimer := time.NewTicker(10 * time.Second) //ticker for 10s
+	for {
+		select {
+		case <-stopCtx.Done():
+			return
+		case msg := <-c.hbReqChan:
+			heartBeatExpiryTimer.Reset(10 * time.Second) //reset ticker
+			hbReqCount++
+			if hbReqCount >= 2 {
+				if hbReqCount == 3 {
+					c.setHeartbeatReqStatus(true)
+					return
+				}
+				err := c.sendHeartbeatResponse(msg)
+				if err != nil {
+					return
+				}
+			}
+		case <-heartBeatExpiryTimer.C:
+			c.setHeartbeatReqStatus(false)
+		}
+	}
+}
+
+func (c *PFCPClient) setHeartbeatReqStatus(status bool) {
+	c.aliveLock.Lock()
+	defer c.aliveLock.Unlock()
+
+	c.isHeartbeatActive = status
+}
+
+func (c *PFCPClient) IsHeartbeatProcedureAlive() bool {
+	c.aliveLock.Lock()
+	defer c.aliveLock.Unlock()
+
+	return c.isHeartbeatActive
 }
