@@ -466,13 +466,13 @@ func (c *PFCPClient) sendHeartbeatResponse(hbreq *message.HeartbeatRequest) erro
 
 func (c *PFCPClient) StartHeartbeatResponse(stopCtx context.Context) {
 	var hbReqCount int = 0
-	heartBeatExpiryTimer := time.NewTicker(10 * time.Second) //ticker for 10s
+	heartBeatExpiryTimer := time.NewTimer(10 * time.Second) //timer for 10s
 	for {
 		select {
 		case <-stopCtx.Done():
 			return
 		case msg := <-c.hbReqChan:
-			heartBeatExpiryTimer.Reset(10 * time.Second) //reset ticker
+			heartBeatExpiryTimer.Reset(10 * time.Second) //reset timer
 			hbReqCount++
 			if hbReqCount >= 2 {
 				if hbReqCount == 3 {
