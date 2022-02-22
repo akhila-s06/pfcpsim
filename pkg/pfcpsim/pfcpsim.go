@@ -477,12 +477,12 @@ func (c *PFCPClient) StartHeartbeatResponse(stopCtx context.Context) {
 			if hbReqCount >= 2 {
 				if hbReqCount == 3 {
 					c.setHeartbeatReqStatus(true)
-					continue
 				}
 				err := c.sendHeartbeatResponse(msg)
 				if err != nil {
 					return
 				}
+				continue
 			}
 		case <-heartBeatExpiryTimer.C:
 			c.setHeartbeatReqStatus(false)
