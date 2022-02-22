@@ -482,7 +482,6 @@ func (c *PFCPClient) StartHeartbeatResponse(stopCtx context.Context) {
 				if err != nil {
 					return
 				}
-				continue
 			}
 		case <-heartBeatExpiryTimer.C:
 			c.setHeartbeatReqStatus(false)
