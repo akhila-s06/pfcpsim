@@ -477,7 +477,7 @@ func (c *PFCPClient) StartHeartbeatResponse(stopCtx context.Context) {
 			if hbReqCount >= 2 {
 				if hbReqCount == 3 {
 					c.setHeartbeatReqStatus(true)
-					return
+					continue
 				}
 				err := c.sendHeartbeatResponse(msg)
 				if err != nil {
@@ -486,6 +486,7 @@ func (c *PFCPClient) StartHeartbeatResponse(stopCtx context.Context) {
 			}
 		case <-heartBeatExpiryTimer.C:
 			c.setHeartbeatReqStatus(false)
+			return
 		}
 	}
 }
