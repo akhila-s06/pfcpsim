@@ -466,7 +466,7 @@ func (c *PFCPClient) sendHeartbeatResponse(hbreq *message.HeartbeatRequest) erro
 
 func (c *PFCPClient) StartHeartbeatResponse(stopCtx context.Context) {
 	var hbReqCount int = 0
-	heartBeatExpiryTimer := time.NewTimer(10 * time.Second) //timer for 10s
+	heartBeatExpiryTimer := time.NewTimer(15 * time.Second) //timer for 10s
 	for {
 		select {
 		case <-stopCtx.Done():
